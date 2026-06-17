@@ -39,3 +39,24 @@ struct ColorLed
   int blue;
   int white;
 };
+
+// Limite luminosità al 25% per protezione hardware in fase test
+static constexpr int LED_BRIGHTNESS_CAP = 60;
+
+enum BladeEffect : uint8_t
+{
+  EFFECT_STATIC = 0,
+  EFFECT_STROBO_TAMARRO = 1,
+  EFFECT_ARCOBALENO_CALDO = 2
+};
+
+// Slot (bank) assegnati agli effetti animati — modificabili qui
+#define BANK_STROBO_TAMARRO    ORANGE   // slot 1
+#define BANK_ARCOBALENO_CALDO  PURPLE   // slot 7
+
+inline BladeEffect bladeEffectForBank(int bank)
+{
+  if (bank == BANK_STROBO_TAMARRO)   return EFFECT_STROBO_TAMARRO;
+  if (bank == BANK_ARCOBALENO_CALDO) return EFFECT_ARCOBALENO_CALDO;
+  return EFFECT_STATIC;
+}

@@ -11,9 +11,11 @@ CoreLed& CoreLed::begin(CoreSettings* cSet) {
     /*     IDLE */     ENT_IDLE,     LP_IDLE,      EXT_IDLE,       -1,     RECHARGE,     ARM,     ARMED,        -1,        -1,         -1,    -1,   
     /* RECHARGE */ ENT_RECHARGE, LP_RECHARGE,      -1,     IDLE,           -1,     ARM,        -1,        -1,        -1,         -1,    -1,
     /*      ARM */      ENT_ARM,      LP_ARM, EXT_ARM,       -1,           -1,      -1,     ARMED,        -1,        -1,     DISARM,    -1,
-    /*    ARMED */    ENT_ARMED,          -1,      -1,       -1,           -1,      -1,        -1,     SWING,     CLASH,     DISARM,    -1,
+    // VECCHIO CODICE: /*    ARMED */    ENT_ARMED,          -1,      -1,       -1,           -1,      -1,        -1,     SWING,     CLASH,     DISARM,    -1,
+    /*    ARMED */    ENT_ARMED,    LP_ARMED,      -1,       -1,           -1,      -1,        -1,     SWING,     CLASH,     DISARM,    -1,
     /*    CLASH */    ENT_CLASH,          -1,      -1,       -1,           -1,      -1,     ARMED,        -1,        -1,         -1,    -1,
-    /*    SWING */    ENT_SWING,          -1,      -1,       -1,           -1,      -1,     ARMED,        -1,     CLASH,         -1,    -1,
+    // VECCHIO CODICE: /*    SWING */    ENT_SWING,          -1,      -1,       -1,           -1,      -1,     ARMED,        -1,     CLASH,         -1,    -1,
+    /*    SWING */    ENT_SWING,    LP_SWING,      -1,       -1,           -1,      -1,     ARMED,        -1,     CLASH,         -1,    -1,
     /*   DISARM */   ENT_DISARM,          -1,      -1,       -1,           -1,      -1,     ARMED,        -1,        -1,       IDLE,    -1,
   };
   // clang-format on
@@ -142,16 +144,81 @@ void CoreLed::action( int id ) {
     case EXT_ARM:
       fadeIn();
       return;
+    /* VECCHIO CODICE:
     case ENT_ARMED:
       originalColorSetId = currentColorSetId;
       changeColor(mainColor);
       return;
+    */
+    case ENT_ARMED:
+      originalColorSetId = currentColorSetId;
+      strobo_pattern = 0;
+      strobo_visible = false;
+      // VECCHIO CODICE: rainbow_phase = 0; — azzerava la fase ad ogni rientro da SWING, rompendo la continuità
+      if (bladeEffectForBank(currentColorSetId) != EFFECT_ARCOBALENO_CALDO)
+      {
+        CoreLogging::writeLine("ENT_ARMED RESET phase->0 (bank=%d non-arcobaleno)", currentColorSetId);
+        rainbow_phase = 0;
+      }
+      else
+      {
+        CoreLogging::writeLine("ENT_ARMED PRESERVE phase=%u (bank=%d arcobaleno)", rainbow_phase, currentColorSetId);
+      }
+      startBladeEffectForBank(currentColorSetId);
+      return;
+    case LP_ARMED:
+      if (timer_blade_effect.expired(this))
+      {
+        switch (bladeEffectForBank(currentColorSetId))
+        {
+          case EFFECT_STROBO_TAMARRO:
+            tickStroboTamarro();
+            timer_blade_effect.setFromNow(this, STROBO_INTERVAL_MS);
+            break;
+          case EFFECT_ARCOBALENO_CALDO:
+            tickArcobalenoCaldo();
+            timer_blade_effect.setFromNow(this, RAINBOW_STEP_MS);
+            break;
+          default:
+            break;
+        }
+      }
+      return;
     case ENT_CLASH:
+      /* VECCHIO CODICE:
       changeColor(clashColor);
+      delay(CLASH_BLINK_TIME);
+      */
+      if (bladeEffectForBank(currentColorSetId) == EFFECT_ARCOBALENO_CALDO)
+      {
+        // Flash bianco per clash su bank arcobaleno
+        changeColor({ LED_BRIGHTNESS_CAP, LED_BRIGHTNESS_CAP, LED_BRIGHTNESS_CAP, 0 });
+      }
+      else
+      {
+        changeColor(clashColor);
+      }
       delay(CLASH_BLINK_TIME);
       return;
     case ENT_SWING:
+      /* VECCHIO CODICE:
       changeColor(swingColor);
+      */
+      if (bladeEffectForBank(currentColorSetId) != EFFECT_ARCOBALENO_CALDO)
+      {
+        changeColor(swingColor);
+      }
+      // Per ARCOBALENO: non cambio il colore, l'effetto continua via LP_SWING
+      return;
+    case LP_SWING:
+      if (timer_blade_effect.expired(this))
+      {
+        if (bladeEffectForBank(currentColorSetId) == EFFECT_ARCOBALENO_CALDO)
+        {
+          tickArcobalenoCaldo();
+          timer_blade_effect.setFromNow(this, RAINBOW_STEP_MS);
+        }
+      }
       return;
     case ENT_DISARM:
       currentColorSetId = originalColorSetId;
@@ -252,6 +319,114 @@ void CoreLed::pulse(const ColorLed& cLed)
     singleStepColor.white = cLed.white / PULSE_DELAY * i;
     changeColor(singleStepColor);
     delay(PULSE_TIME / 2 / PULSE_DELAY);
+  }
+}
+
+ColorLed CoreLed::clampBrightness(const ColorLed& c) const
+{
+  auto cap = [](int v) { return min(v, LED_BRIGHTNESS_CAP); };
+  return { cap(c.red), cap(c.green), cap(c.blue), cap(c.white) };
+}
+
+ColorLed CoreLed::lerpColor(const ColorLed& from, const ColorLed& to, uint8_t frac) const
+{
+  auto mix = [frac](int a, int b) {
+    return a + ((b - a) * (int)frac) / 255;
+  };
+  return {
+    mix(from.red, to.red),
+    mix(from.green, to.green),
+    mix(from.blue, to.blue),
+    mix(from.white, to.white)
+  };
+}
+
+ColorLed CoreLed::warmRainbowAtPhase(uint16_t phase) const
+{
+  // Colori definiti in scala LED_BRIGHTNESS_CAP (non a 255).
+  // Con colori a 255 + clampBrightness posteriore, entrambi i canali R e B si saturano
+  // a CAP per centinaia di fasi consecutive (output identico {CAP,0,CAP}), rendendo
+  // l'animazione visivamente bloccata. Con valori al cap il lerp opera in [0,CAP]
+  // e ogni fase produce un colore distinto e visibile.
+  static const ColorLed red    = { LED_BRIGHTNESS_CAP, 0,                  0,                  0 };
+  static const ColorLed violet = { LED_BRIGHTNESS_CAP, 0,                  LED_BRIGHTNESS_CAP, 0 };
+  static const ColorLed blue   = { 0,                  0,                  LED_BRIGHTNESS_CAP, 0 };
+
+  static constexpr uint16_t SEG0 = 75;   // red → violet (era 150)
+  static constexpr uint16_t SEG1 = 711;  // violet → blue (era 400)
+  // SEG2 = RAINBOW_PHASE_MAX - SEG0 - SEG1 = 237  (blue → red, era 473)
+
+  if (phase < SEG0)
+  {
+    return lerpColor(red, violet, (uint8_t)((phase * 255UL) / SEG0));
+  }
+  if (phase < SEG0 + SEG1)
+  {
+    return lerpColor(violet, blue, (uint8_t)(((phase - SEG0) * 255UL) / SEG1));
+  }
+  const uint16_t seg2 = RAINBOW_PHASE_MAX - SEG0 - SEG1;  // 237
+  return lerpColor(blue, red, (uint8_t)(((phase - SEG0 - SEG1) * 255UL) / seg2));
+}
+
+void CoreLed::tickStroboTamarro()
+{
+  strobo_visible = !strobo_visible;
+
+  if (!strobo_visible)
+  {
+    changeColor({ 0, 0, 0, 0 });
+    return;
+  }
+
+  // Pattern aggressivo: flash bianchi e primari a massima luminosità consentita
+  static const ColorLed patterns[] = {
+    { LED_BRIGHTNESS_CAP, LED_BRIGHTNESS_CAP, LED_BRIGHTNESS_CAP, 0 }, // bianco
+    { LED_BRIGHTNESS_CAP, 0, 0, 0 },                                   // rosso
+    { 0, 0, LED_BRIGHTNESS_CAP, 0 },                                   // blu
+    { LED_BRIGHTNESS_CAP, LED_BRIGHTNESS_CAP, 0, 0 },                  // giallo
+    { LED_BRIGHTNESS_CAP, 0, LED_BRIGHTNESS_CAP, 0 },                  // magenta
+    { 0, LED_BRIGHTNESS_CAP, LED_BRIGHTNESS_CAP, 0 },                  // ciano
+  };
+
+  changeColor(patterns[strobo_pattern % (sizeof(patterns) / sizeof(patterns[0]))]);
+  strobo_pattern++;
+}
+
+void CoreLed::tickArcobalenoCaldo()
+{
+  // I colori in warmRainbowAtPhase sono già in scala LED_BRIGHTNESS_CAP: clampBrightness è no-op.
+  // Se i valori R/G/B nel log superano LED_BRIGHTNESS_CAP c'è un bug nei colori base.
+  ColorLed c = warmRainbowAtPhase(rainbow_phase);
+  const char* seg = (rainbow_phase < 75) ? "R>V" : (rainbow_phase < 786) ? "V>B" : "B>R";
+  CoreLogging::writeLine("ARC [%s] phase=%u R=%d G=%d B=%d", seg, rainbow_phase, c.red, c.green, c.blue);
+  changeColor(c);
+  rainbow_phase++;
+  if (rainbow_phase > RAINBOW_PHASE_MAX)
+  {
+    CoreLogging::writeLine("ARC WRAP->0");
+    rainbow_phase = 0;
+  }
+}
+
+void CoreLed::startBladeEffectForBank(int bank)
+{
+  BladeEffect eff = bladeEffectForBank(bank);
+  CoreLogging::writeLine("startBladeEffect bank=%d eff=%d", bank, (int)eff);
+  switch (eff)
+  {
+    case EFFECT_STROBO_TAMARRO:
+      tickStroboTamarro();
+      timer_blade_effect.setFromNow(this, STROBO_INTERVAL_MS);
+      break;
+
+    case EFFECT_ARCOBALENO_CALDO:
+      tickArcobalenoCaldo();
+      timer_blade_effect.setFromNow(this, RAINBOW_STEP_MS);
+      break;
+
+    default:
+      changeColor(clampBrightness(mainColor));
+      break;
   }
 }
 
