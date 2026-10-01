@@ -2,7 +2,8 @@
 
 Questa guida spiega come compilare e caricare il firmware con gli **effetti lama**
 (Arcobaleno caldo ed Elettrico) usando PlatformIO da terminale, e come tornare al
-comportamento originale con un solo comando.
+comportamento originale con un solo comando. Cosa è cambiato nel codice è descritto
+in [MODIFICHE_EFFETTI_LAMA.md](MODIFICHE_EFFETTI_LAMA.md).
 
 > **In breve**
 > ```sh
