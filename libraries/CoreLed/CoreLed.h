@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Automaton.h>
+#include "BladeEffects.h"
 #include "CoreLogging.h"
 #include "CoreSettings.h"
 
@@ -40,8 +41,6 @@ class CoreLed: public Machine {
   void pulse(const ColorLed& cLed);
 
  private:
-  // VECCHIO CODICE: enum { ENT_IDLE, LP_IDLE, ENT_RECHARGE, LP_RECHARGE, ENT_ARM, LP_ARM, EXT_IDLE, EXT_ARM, ENT_ARMED, ENT_CLASH, ENT_SWING, ENT_DISARM }; // ACTIONS
-  // VECCHIO CODICE: enum { ENT_IDLE, LP_IDLE, ENT_RECHARGE, LP_RECHARGE, ENT_ARM, LP_ARM, EXT_IDLE, EXT_ARM, ENT_ARMED, LP_ARMED, ENT_CLASH, ENT_SWING, ENT_DISARM }; // ACTIONS
   enum { ENT_IDLE, LP_IDLE, ENT_RECHARGE, LP_RECHARGE, ENT_ARM, LP_ARM, EXT_IDLE, EXT_ARM, ENT_ARMED, LP_ARMED, ENT_CLASH, ENT_SWING, LP_SWING, ENT_DISARM }; // ACTIONS
   enum { ON_ARM, ON_ARMED, ON_CLASH, ON_DISARM, ON_NEXTCOLOR, ON_RECHARGE, ON_SWING, CONN_MAX }; // CONNECTORS
   atm_connector connectors[CONN_MAX];
@@ -52,23 +51,14 @@ class CoreLed: public Machine {
   void getCurrentColorSet();
   void setCurrentColorSet(int colorSetId);
   void changeColor(const ColorLed& cLed);
-  void fadeIn();
-  void fadeOut();
+  void fadeIn(const ColorLed& target);
+  void fadeOut(const ColorLed& from);
+  ColorLed ignitionColor();
+  void renderBladeEffect();
+  void previewBladeEffect();
   atm_timer_millis timer_blink;
   atm_timer_millis timer_color_selection;
-  atm_timer_millis timer_blade_effect;
-  uint8_t strobo_pattern = 0;
-  bool strobo_visible = false;
-  uint16_t rainbow_phase = 0;
-  static constexpr int STROBO_INTERVAL_MS = 18;
-  static constexpr int RAINBOW_STEP_MS = 10;
-  static constexpr int RAINBOW_PHASE_MAX = 1023;
-  ColorLed clampBrightness(const ColorLed& c) const;
-  ColorLed lerpColor(const ColorLed& from, const ColorLed& to, uint8_t frac) const;
-  ColorLed warmRainbowAtPhase(uint16_t phase) const;
-  void tickStroboTamarro();
-  void tickArcobalenoCaldo();
-  void startBladeEffectForBank(int bank);
+  BladeEffectPlayer bladeEffect;
   int currentColorSetId = OFF;
   int originalColorSetId;
   int nextColorSetId = OFF;
@@ -115,18 +105,15 @@ Automaton::ATML::begin - Automaton Markup Language
         <EVT_ARMED>ARMED</EVT_ARMED>
         <EVT_DISARM>DISARM</EVT_ARMED>
       </ARM>
-*/
-      // VECCHIO CODICE: <ARMED index="3" on_enter="ENT_ARMED">
-      // <ARMED index="3" on_enter="ENT_ARMED" on_loop="LP_ARMED">
-      //       <EVT_SWING>SWING</EVT_SWING>
-      //       <EVT_CLASH>CLASH</EVT_CLASH>
-      //       <EVT_DISARM>DISARM</EVT_DISARM>
-      //     </ARMED>
-/*
+      <ARMED index="3" on_enter="ENT_ARMED" on_loop="LP_ARMED">
+        <EVT_SWING>SWING</EVT_SWING>
+        <EVT_CLASH>CLASH</EVT_CLASH>
+        <EVT_DISARM>DISARM</EVT_DISARM>
+      </ARMED>
       <CLASH index="4" on_enter="ENT_CLASH">
         <EVT_ARMED>ARMED</EVT_ARMED>
       </CLASH>
-      <SWING index="5" on_enter="ENT_SWING">
+      <SWING index="5" on_enter="ENT_SWING" on_loop="LP_SWING">
         <EVT_ARMED>ARMED</EVT_ARMED>
         <EVT_CLASH>CLASH</EVT_CLASH>
       </SWING>

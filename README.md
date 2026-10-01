@@ -62,6 +62,7 @@ We strongly recommend to install VS Code and PlatformIO extension.
 
 - [Get ready with GitHub](https://github.com/LamaDiLuce/polaris-opencore/wiki/Git)
 - [Configure VS Code plus PlatformIO](https://github.com/LamaDiLuce/polaris-opencore/wiki/VSCode-PlatformIO)
+- [Guida (IT): caricare il firmware con gli effetti lama da terminale](Documentation/GUIDA_FLASH_TERMINALE.md)
 
 ---
 
