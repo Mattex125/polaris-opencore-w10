@@ -51,6 +51,7 @@ class CoreLed: public Machine {
   void getCurrentColorSet();
   void setCurrentColorSet(int colorSetId);
   void changeColor(const ColorLed& cLed);
+  int fadeLevel(int value, int step);
   void fadeIn(const ColorLed& target);
   void fadeOut(const ColorLed& from);
   ColorLed ignitionColor();

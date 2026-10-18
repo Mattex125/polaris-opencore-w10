@@ -15,6 +15,7 @@ To read the entire story you can follow [this link](https://www.lamadiluce.it/po
 ---
 
 ## Table of contents
+- [Effetti lama (IT)](#effetti-lama)
 - [Introduction](#introduction)
 - [Features](#features)
 - [Setup](#setup)
@@ -23,6 +24,82 @@ To read the entire story you can follow [this link](https://www.lamadiluce.it/po
 - [FAQ](#faq)
 - [Donations](#donations)
 - [License](#license)
+
+---
+
+## Effetti lama
+
+Questa versione del firmware aggiunge due effetti animati alla lama. Tutti gli altri slot
+funzionano esattamente come nel firmware originale.
+
+| Slot | Effetto | Da fermo | In movimento (swing) | Colpo (clash) |
+|---|---|---|---|---|
+| 1 – ORANGE | **Arcobaleno caldo** | rosso → viola → blu → rosa, ciclo di circa 10 s | continua | colore clash dello slot, poi riprende |
+| 2 – YELLOW | **Elettrico** | si accende e si spegne a tempi irregolari, con il colore principale dello slot | si ferma sul colore swing dello slot | colore clash dello slot, poi riprende |
+
+### Come si mette sulla spada
+
+Dalla cartella del progetto, con la spada collegata via USB e l'app di configurazione chiusa:
+
+```sh
+git checkout master
+git pull
+pio run              # deve finire con [SUCCESS]
+pio run -t upload    # carica il firmware sulla spada
+```
+
+Colori, suoni e impostazioni salvati sulla spada non vengono toccati. La guida passo passo
+(PlatformIO su Windows, macOS e Linux, problemi comuni) è in
+[Documentation/GUIDA_FLASH_TERMINALE.md](Documentation/GUIDA_FLASH_TERMINALE.md).
+
+### Come si usa
+
+- Accendi la spada e scegli lo slot come fai di solito durante la selezione del colore:
+  ORANGE è l'arcobaleno, YELLOW è l'elettrico. Durante la selezione questi due slot
+  mostrano un'anteprima dell'effetto.
+- In alternativa, con la spada collegata via USB, puoi scegliere lo slot da seriale con
+  `B=1` (arcobaleno) o `B=2` (elettrico).
+- La spada ricorda l'ultimo slot usato anche dopo lo spegnimento.
+
+### Come si riavvia
+
+- Dopo `pio run -t upload` la scheda si riavvia da sola con il nuovo firmware: scollega
+  l'USB e la spada è pronta.
+- Ogni volta che cambi qualcosa nel file di configurazione devi ricompilare e ricaricare
+  con `pio run -t upload`.
+- Se il caricamento resta in attesa, chiudi l'app di configurazione e i monitor seriali,
+  scollega e ricollega l'USB, poi rilancia `pio run -t upload`.
+
+### Come si cambia (slot, luminosità, colori)
+
+Tutto si trova in un solo file, `libraries/CoreLed/BladeEffectsConfig.h`:
+
+| Cosa | Riga |
+|---|---|
+| Slot dell'arcobaleno | `SLOT_WARM_RAINBOW = ORANGE;` |
+| Slot dell'elettrico | `SLOT_ELECTRIC = YELLOW;` |
+| Luminosità degli effetti | `EFFECT_BRIGHTNESS_PERCENT = 90;` (1–100) |
+| Colori e tempi dell'arcobaleno | tabella `RAINBOW_STOPS` (c'è già pronta una variante con il rosa esplicito) |
+| Velocità dell'elettrico | `ELECTRIC_ON_MIN_MS`, `ELECTRIC_ON_MAX_MS`, `ELECTRIC_OFF_MIN_MS`, `ELECTRIC_OFF_MAX_MS` |
+
+Gli slot si indicano per nome (`RED`, `ORANGE`, `YELLOW`, `GREEN`, `WHITE`, `ACQUA`, `BLUE`,
+`PURPLE`) o con il numero da 0 a 7. Se un valore non è valido, la compilazione si ferma con un
+messaggio in italiano e sulla spada non arriva nulla.
+
+### Come si toglie
+
+| Cosa vuoi fare | Come |
+|---|---|
+| Tornare al comportamento originale senza modificare file | `pio run -e teensy31_stock -t upload` |
+| Disattivare gli effetti nel codice | in `BladeEffectsConfig.h` metti `#define BLADE_EFFECTS_ENABLED 0`, poi `pio run -t upload` |
+| Togliere un solo effetto | `SLOT_WARM_RAINBOW = NO_SLOT;` oppure `SLOT_ELECTRIC = NO_SLOT;`, poi `pio run -t upload` |
+| Rimettere gli effetti | flag a 1, poi `pio run -t upload` |
+
+Con gli effetti disattivati il LED si comporta al bit come nel firmware originale. In tutti
+i casi colori, suoni e impostazioni salvati sulla spada restano invariati.
+
+Cosa è cambiato nel codice e come è stato verificato:
+[Documentation/MODIFICHE_EFFETTI_LAMA.md](Documentation/MODIFICHE_EFFETTI_LAMA.md).
 
 ---
 
@@ -62,8 +139,6 @@ We strongly recommend to install VS Code and PlatformIO extension.
 
 - [Get ready with GitHub](https://github.com/LamaDiLuce/polaris-opencore/wiki/Git)
 - [Configure VS Code plus PlatformIO](https://github.com/LamaDiLuce/polaris-opencore/wiki/VSCode-PlatformIO)
-- [Guida (IT): caricare il firmware con gli effetti lama da terminale](Documentation/GUIDA_FLASH_TERMINALE.md)
-- [Modifiche (IT): effetti lama Arcobaleno caldo ed Elettrico](Documentation/MODIFICHE_EFFETTI_LAMA.md)
 
 ---
 

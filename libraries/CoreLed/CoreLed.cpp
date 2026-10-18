@@ -230,15 +230,23 @@ void CoreLed::changeColor(const ColorLed& cLed)
   analogWrite(PIN_WHITE, !COMMON_GND ? cLed.white : 255 - cLed.white);
 }
 
+// Livello di un canale al passo 'step' del fade (0..FADE_DELAY).
+// Sugli slot con effetto il fade arriva esattamente al colore dell'effetto (nessun salto);
+// sugli altri slot resta la formula originale, cosi' il loro comportamento non cambia.
+int CoreLed::fadeLevel(int value, int step)
+{
+  return bladeEffect.isActive() ? value * step / FADE_DELAY : value / FADE_DELAY * step;
+}
+
 void CoreLed::fadeIn(const ColorLed& target)
 {
   CoreLogging::writeLine("CoreLed: FadeIn");
   for (int i = 0; i <= FADE_DELAY; i++)
   {
-    singleStepColor.red = target.red * i / FADE_DELAY;
-    singleStepColor.green = target.green * i / FADE_DELAY;
-    singleStepColor.blue = target.blue * i / FADE_DELAY;
-    singleStepColor.white = target.white * i / FADE_DELAY;
+    singleStepColor.red = fadeLevel(target.red, i);
+    singleStepColor.green = fadeLevel(target.green, i);
+    singleStepColor.blue = fadeLevel(target.blue, i);
+    singleStepColor.white = fadeLevel(target.white, i);
     changeColor(singleStepColor);
     delay(FADE_IN_TIME / FADE_DELAY);
   }
@@ -249,10 +257,10 @@ void CoreLed::fadeOut(const ColorLed& from)
   CoreLogging::writeLine("CoreLed: FadeOut");
   for (int i = FADE_DELAY; i >= 0; i--)
   {
-    singleStepColor.red = from.red * i / FADE_DELAY;
-    singleStepColor.green = from.green * i / FADE_DELAY;
-    singleStepColor.blue = from.blue * i / FADE_DELAY;
-    singleStepColor.white = from.white * i / FADE_DELAY;
+    singleStepColor.red = fadeLevel(from.red, i);
+    singleStepColor.green = fadeLevel(from.green, i);
+    singleStepColor.blue = fadeLevel(from.blue, i);
+    singleStepColor.white = fadeLevel(from.white, i);
     changeColor(singleStepColor);
     delay(FADE_OUT_TIME / FADE_DELAY);
   }

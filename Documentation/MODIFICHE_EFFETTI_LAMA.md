@@ -52,29 +52,65 @@ Scintilla/Gilthoniel), suoni, ricarica, batteria, movimento.
 - **Gli slot normali scendevano al 25% una volta accesi.** Tornano a piena luminosità come l'originale.
 - **Il limite di luminosità tagliava i canali e cambiava la tinta** (es. arancione → giallo).
   Ora il colore viene scalato in proporzione.
-- **Fade-in e fade-out usavano il colore base dello slot**, con un salto visibile. Ora partono dal colore dell'effetto.
+- **Fade-in e fade-out usavano il colore base dello slot**, con un salto visibile. Ora partono dal colore dell'effetto
+  e, sugli slot con effetto, arrivano esattamente a quel colore. Gli slot normali usano la formula originale.
 - **Log `snprintf` ogni 10 ms anche con `DEBUG` spento.** Rimossi.
-- **Fade più preciso su tutti gli slot.** Prima arrivava a 240 invece di 255 e azzerava i canali sotto 30.
+
+## Garanzia sul comportamento originale
+
+Con `BLADE_EFFECTS_ENABLED 0` (o con l'env `teensy31_stock`), e su tutti gli slot senza
+effetto, il LED si comporta **al bit come il firmware originale**: stessi colori, negli
+stessi istanti, con gli stessi tempi di scelta colore e di blocco del loop. È verificato in
+simulazione (vedi sotto).
 
 ## Verifiche fatte
 
-- Test sul PC del motore degli effetti (C++11/14/17, warning come errori):
-  - continuità del colore millisecondo per millisecondo;
-  - valori sempre entro i limiti;
-  - rollover di `millis()`;
-  - tempi dell'elettrico;
-  - associazione slot → effetto con flag a 1 e a 0.
-- L'arcobaleno nuovo coincide con quello della prima versione: al massimo 4 livelli
-  di differenza su 229, dovuti all'arrotondamento della vecchia scala a 60 livelli.
-- Ogni configurazione non valida provata blocca la compilazione con il messaggio giusto.
-- `CoreLed.cpp` e `BladeEffects.cpp` compilati per Cortex-M4 (Teensy 3.2) con il core
-  Teensy 1.59, in gnu++14 e gnu++17:
-  - nessun warning nei file modificati;
-  - stessi warning del core dell'originale;
-  - tutti i simboli si risolvono.
+**Compilazione completa con PlatformIO** (`pio run`, entrambi gli env):
+
+- piattaforma Teensy 6.0.0 (GCC 15.2, Teensyduino 1.62) e piattaforma vecchia 4.17.0
+  (GCC 5.4, Teensyduino 1.57): `[SUCCESS]` in entrambi i casi;
+- nessun warning nei file modificati, con entrambe le piattaforme; con la piattaforma attuale
+  gli altri warning sono gli stessi 10 dell'originale (`CoreComms`, `CoreSettings`, core Teensy);
+- memoria: RAM 15032 byte (+64 rispetto all'originale), Flash 117232 byte su 262144;
+- nell'env `teensy31_stock` la funzione che sceglie l'effetto restituisce sempre "nessuno"
+  (controllato sul codice macchina).
+
+**Simulazione della spada sul PC.** Il vero `CoreLed.cpp` e la vera macchina a stati
+Automaton girano su un orologio simulato, con AddressSanitizer e UBSan attivi. Vengono
+registrati tutti i colori scritti sui LED, su:
+
+- 5 scenari: uso completo, scelta colore, 60 s accesa con swing di 20 s, accensione diretta,
+  scelta colore interrotta;
+- tutti gli 8 slot, con l'orologio che parte da zero oppure a 3 s dal giro di `millis()`
+  (dopo 49 giorni);
+- 400 sequenze casuali di eventi, anche non validi, con USB collegata e scollegata a caso.
+
+Risultati:
+
+- nessun crash e nessun errore dei sanitizer in 1520 esecuzioni;
+- flag a 0 e slot normali: uguali al bit all'originale in tutti i 130 confronti sugli scenari
+  e in tutte le 400 sequenze casuali;
+- con gli effetti attivi: stessi tempi di scelta colore, stessi stati finali, stessi salvataggi
+  in memoria e stesso blocco massimo del loop dell'originale (1833 ms, watchdog a 4000 ms);
+- **arcobaleno:**
+  - ogni colore coincide al millisecondo con la palette, anche attraverso swing, colpi e
+    giro di `millis()`;
+  - in uno swing di 20 s si aggiorna 2000 volte (la prima versione: 0 volte, ferma);
+  - il colpo mostra il colore clash dello slot;
+- **elettrico:**
+  - acceso per 20–160 ms e spento per 10–60 ms, sempre alternato;
+  - nello swing resta fisso sul colore swing;
+  - dopo swing e colpo riparte acceso;
+- fade di accensione e spegnimento senza salti; anteprime nella scelta colore come previsto.
+
+**Test del motore degli effetti** (C++11/14/17, warning come errori):
+
+- continuità e range dei colori;
+- tempi dell'elettrico;
+- associazione slot → effetto;
+- ogni configurazione non valida blocca la compilazione con il messaggio giusto.
 
 ## Non ancora verificato
 
-- **Compilazione completa con PlatformIO:** il registro di PlatformIO non era raggiungibile
-  dall'ambiente di sviluppo. Va fatta con `pio run` prima del flash.
-- **Prova sulla spada:** checklist al punto 6 della guida.
+- **Prova sulla spada vera:** la simulazione riproduce il codice, non l'hardware. Segui la
+  checklist al punto 6 della guida.

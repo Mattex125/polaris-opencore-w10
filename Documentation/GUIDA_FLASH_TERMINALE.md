@@ -9,7 +9,6 @@ in [MODIFICHE_EFFETTI_LAMA.md](MODIFICHE_EFFETTI_LAMA.md).
 > ```sh
 > git clone https://github.com/Mattex125/polaris-opencore-w10.git
 > cd polaris-opencore-w10
-> git checkout claude/confident-cerf-1aaiks
 > pio run -t upload                      # versione con effetti
 > pio run -e teensy31_stock -t upload    # versione originale (rollback)
 > ```
@@ -63,20 +62,20 @@ Poi scollega e ricollega la spada.
 
 ## 2. Scaricare questa versione
 
+La versione con gli effetti è sul branch `master`.
+
 Prima volta:
 
 ```sh
 git clone https://github.com/Mattex125/polaris-opencore-w10.git
 cd polaris-opencore-w10
-git checkout claude/confident-cerf-1aaiks
 ```
 
 Se hai già la cartella, per aggiornarla:
 
 ```sh
 cd polaris-opencore-w10
-git fetch origin
-git checkout claude/confident-cerf-1aaiks
+git checkout master
 git pull
 ```
 
